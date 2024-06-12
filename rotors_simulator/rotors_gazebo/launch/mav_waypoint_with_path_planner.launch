@@ -1,0 +1,59 @@
+<launch>
+  <arg name="mav_name" default="firefly"/>
+  <arg name="render_stereo" default="false" />
+  <!-- world_name options: drgazebo2, salonGazebo -->
+  <arg name="world_name" default="drgazebo2"/>
+  <arg name="enable_logging" default="false" />
+  <arg name="enable_ground_truth" default="true" />
+  <arg name="log_file" default="$(arg mav_name)" />
+  <arg name="debug" default="false"/>
+  <arg name="gui" default="true"/>
+  <arg name="paused" default="true"/>
+  <!-- The following line causes gzmsg and gzerr messages to be printed to the console
+      (even when Gazebo is started through roslaunch) -->
+  <arg name="verbose" default="false"/>
+  <arg name="spawn_x" value="0.0"/> <!--[cyw]:desired initail UAV position -->
+  <arg name="spawn_y" value="0.0"/>
+  <arg name="spawn_z" value="0.1"/>
+
+  <env name="GAZEBO_MODEL_PATH" value="${GAZEBO_MODEL_PATH}:$(find rotors_gazebo)/models"/>
+  <env name="GAZEBO_RESOURCE_PATH" value="${GAZEBO_RESOURCE_PATH}:$(find rotors_gazebo)/models"/>
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(find rotors_gazebo)/worlds/$(arg world_name)" />
+    <arg name="debug" value="$(arg debug)" />
+    <arg name="paused" value="$(arg paused)" />
+    <arg name="gui" value="$(arg gui)" />
+    <arg name="verbose" value="$(arg verbose)"/>
+  </include>
+
+  <group ns="$(arg mav_name)">
+    <include file="$(find rotors_gazebo)/launch/spawn_mav.launch">
+      <arg name="mav_name" value="$(arg mav_name)" />
+      <arg name="x" value="$(arg spawn_x)" />
+      <arg name="y" value="$(arg spawn_y)" />
+      <arg name="z" value="$(arg spawn_z)" />
+      <arg name="model" value="$(find rotors_description)/urdf/mav_with_vi_sensor.gazebo" />
+      <arg name="enable_logging" value="$(arg enable_logging)" />
+      <arg name="enable_ground_truth" value="$(arg enable_ground_truth)" />
+      <arg name="log_file" value="$(arg log_file)"/>
+    </include>
+    <node name="lee_position_controller_node" pkg="rotors_control" type="lee_position_controller_node" output="screen">
+      <rosparam command="load" file="$(find rotors_gazebo)/resource/lee_controller_$(arg mav_name).yaml" />
+      <rosparam command="load" file="$(find rotors_gazebo)/resource/$(arg mav_name).yaml" />
+      <remap from="odometry" to="odometry_sensor1/odometry" />
+    </node>
+    <node name="path_planner_publisher" pkg="rotors_gazebo" type="path_planner_publisher" output="screen">
+      <param name="traj_filename" value="/home/nmsl/rotorS_ws/sim_trajectory.csv" /> <!--[cyw]:save waypoint path -->
+      <param name="x" value="$(arg spawn_x)"/> <!--[cyw]:desired first waypoint position -->
+      <param name="y" value="$(arg spawn_y)"/>
+      <param name="z" value="5.0"/>
+    </node>
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
+    <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" />
+  </group>
+  <include file="$(find flightgoggles_ros_bridge)/launch/bridge.launch">
+      <arg name="mav_name" value="$(arg mav_name)" />
+      <arg name="scene_filename" value="$(arg world_name)"/>
+      <arg name="render_stereo" default="$(arg render_stereo)" />
+  </include>
+</launch>
